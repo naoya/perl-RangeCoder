@@ -1,0 +1,23 @@
+* これはなに?
+
+perl で実装した Range Coder
+
+- lib/RangeCoder.pm : 静的 Range Coder
+- lib/RangeCoder/Adaptive.pm : 適応型, 累積頻度表の実装はナイーブ
+- lib/RangeCoder/Adaptive/BIT.pm : 適応型, Binary Indexed Tree で高速化
+- lib/RangeCoder/FiniteContext.pm : 有限文脈モデル (1-order)
+
+WEB+DB PRESS Vol.52 で解説予定
+
+** 参考にした情報
+
+広井誠さんの "Algorithms with Python" を参考に実装
+
+- http://www.geocities.jp/m_hiroi/light/pyalgo36.html
+- http://www.geocities.jp/m_hiroi/light/pyalgo37.html
+- http://www.geocities.jp/m_hiroi/light/pyalgo38.html
+
+** TODO
+
+- テストコード
+- 下限の幅が 24 ビット → もっと上げられる?
