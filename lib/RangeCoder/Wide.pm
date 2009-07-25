@@ -16,10 +16,10 @@ sub new {
     my ($class, $count) = @_;
     my $self = bless { count => $count }, $class;
 
-    if ((my $m = max(@$count)) > 0xffff) {
+    if ((my $m = max(@$count)) >= 0x7fff) {
        use integer;
        for my $v (@$count) {
-           $v = ($v * 0xffff + $m - 1) / $m;
+           $v = ($v * 0x7fff + $m - 1) / $m;
        }
     }
 
@@ -42,11 +42,8 @@ sub new {
 
 sub encode {
     my ($self, $in, $out, $size) = @_;
-
-    ## サイズ書き込み
     $out->print(pack('I', $size));
 
-    ## 出現頻度表書き込み
     my $cnt_bin = pack('w*', @{$self->{count}});
     $out->print(pack('I', length $cnt_bin));
     $out->print($cnt_bin);
@@ -70,7 +67,6 @@ sub encode_normalize {
     my ($self, $old_low, $out) = @_;
 
     if ($self->{low} < $old_low) {
-        ## 桁上がり
         $self->{buff} += 1;
         if ($self->{n_carry} > 0) {
             putc($out, $self->{buff});
@@ -83,21 +79,16 @@ sub encode_normalize {
     }
 
     while ($self->{range} < MIN_RANGE) {
-        ## range が MIN_RANGE (MAX_RANGE の 1/256) 以下になった
-        ## → low の上位1バイトを削る, range を引き延ばす
         if ($self->{low} < (0xff << SHIFT)) {
             putc($out, $self->{buff});
             for (my $i = $self->{n_carry}; $i > 0; $i--) {
                 putc($out, 0xff);
             }
-            $self->{buff} = ($self->{low} >> SHIFT) & 0xff; # low の上位 1 バイトを buff に
+            $self->{buff} = ($self->{low} >> SHIFT) & 0xff;
             $self->{n_carry}  = 0;
         } else {
-            ## 上位1バイトが 0xff だった
             $self->{n_carry} += 1;
         }
-
-        ## low, range を 256 倍 (low は 256 倍のあと 24 bit に収める)
         $self->{low} = ($self->{low} << 8) & MASK;
         $self->{range} <<= 8;
     }
@@ -119,29 +110,20 @@ sub finish {
 
 sub decode {
     my ($class, $in, $out) = @_;
-
-    ## サイズ読み込み
     $in->read(my $tmp, 8) or die $@;
     my ($size, $cnt_size) = unpack('I2', $tmp);
 
-    ## 頻度表読み込み
     $in->read(my $cnt_bin, $cnt_size) or die $!;
     my @count = unpack('w*', $cnt_bin);
-
-    # 1 byte 読み捨て
     &getc($in);
 
     my $self = $class->new(\@count);
-
-    ## 31 bit 読み込み、最後の 1 ビットは buff に保存
     $self->{low} = &getc($in);
     $self->{low} = ($self->{low} << 8) + &getc($in);
     $self->{low} = ($self->{low} << 8) + &getc($in);
     $self->{buff} = &getc($in);
     $self->{low} = ($self->{low} << 7) + ($self->{buff} >> 1);
 
-    ## cumfreq[c]/total <= low/range < cumfreq[c + 1]/total な c を探す
-    ## 探し当てたら low と range を更新して同様に繰り返す
     while ($size > 0) {
         my ($tmp, $c);
         {
@@ -163,10 +145,10 @@ sub decode_normalize {
     my ($self, $in) = @_;
     while ($self->{range} < MIN_RANGE) {
         # buff の 1 ビット挿入
-        $self->{low} = ($self->{low} << 1) + ($self->{buff} & 1); 
+        $self->{low} = ($self->{low} << 1) + ($self->{buff} & 1);
         # 読み出したデータから上位 7 ビットを挿入。残り1ビットは buff に残して次回に
         $self->{buff} = &getc($in);
-        $self->{low} = (($self->{low} << 7) + ($self->{buff} >> 1)) & MASK; 
+        $self->{low} = (($self->{low} << 7) + ($self->{buff} >> 1)) & MASK;
         $self->{range} <<= 8;
     }
 }
