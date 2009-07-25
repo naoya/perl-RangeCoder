@@ -16,8 +16,6 @@ sub new {
     my ($class, $count) = @_;
     my $self = bless { count => $count }, $class;
 
-    ## Smoothing (奥村さんの方式)
-    ## 度数の最大値が 0xffff になるように調節
     if ((my $m = max(@$count)) > 0xffff) {
        use integer;
        for my $v (@$count) {
