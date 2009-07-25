@@ -2,14 +2,15 @@
 
 perl で実装した Range Coder
 
-- lib/RangeCoder.pm : 静的 Range Coder
+- lib/RangeCoder.pm : 静的 Range Coder, low: 24bit, range 初期値 0x1000000)
 - lib/RangeCoder/Adaptive.pm : 適応型, 累積頻度表の実装はナイーブ
-- lib/RangeCoder/Adaptive/BIT.pm : 適応型, Binary Indexed Tree で高速化
-- lib/RangeCoder/FiniteContext.pm : 有限文脈モデル (1-order)
+- lib/RangeCoder/Wide.pm : 静的 Range Coder, low 31bit, range 初期値 0x7fffffff
+- lib/RangeCoder/Adaptive/BIT.pm : 適応型, Binary Indexed Tree で高速化, low 31 bit
+- lib/RangeCoder/FiniteContext.pm : 有限文脈モデル (1-order), low 31bit
 
 WEB+DB PRESS Vol.52 で解説予定
 
-** 参考にした情報
+* 参考にした情報
 
 広井誠さんの "Algorithms with Python" を参考に実装
 
@@ -17,8 +18,13 @@ WEB+DB PRESS Vol.52 で解説予定
 - http://www.geocities.jp/m_hiroi/light/pyalgo37.html
 - http://www.geocities.jp/m_hiroi/light/pyalgo38.html
 
-** TODO
+* 謝辞
+
+low を 31 bit で扱う方法に関して、Alogrithms with Python の執筆者でもあ
+られる広井誠さんから直々に方法を教えていただきました。ありがとうござい
+ました。
+
+* TODO
 
 - テストコード
 - 速度チューニング
-- 下限の幅が 24 ビット → もっと上げられる?

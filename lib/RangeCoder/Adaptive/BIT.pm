@@ -6,12 +6,10 @@ use RangeCoder::Util;
 use Algorithm::BIT;
 
 use constant UCHAR_MAX => 256;
-use constant MAX_RANGE => 0x1000000;
-use constant MIN_RANGE => 0x10000;
-use constant MASK      => 0xffffff;
-use constant SHIFT     => 16;
-
-use Algorithm::BIT;
+use constant MAX_RANGE => 0x7fffffff;
+use constant MIN_RANGE => 0x800000;
+use constant MASK      => 0x7fffffff;
+use constant SHIFT     => 23;
 
 sub new {
     my ($class) = @_;
@@ -104,9 +102,10 @@ sub finish {
     for (my $i = $self->{n_carry}; $i > 0; $i--) {
         putc($out, 0xff);
     }
-    putc($out, ($self->{low} >> 16) & 0xff);
-    putc($out, ($self->{low} >> 8)  & 0xff);
-    putc($out, $self->{low} & 0xff);
+    putc($out, ($self->{low} >> 23)  & 0xff);
+    putc($out, ($self->{low} >> 15)  & 0xff);
+    putc($out, ($self->{low} >> 7)    & 0xff);
+    putc($out, ($self->{low} & 0x7f) << 1);
 }
 
 sub decode {
@@ -120,6 +119,8 @@ sub decode {
     $self->{low} = &getc($in);
     $self->{low} = ($self->{low} << 8) + &getc($in);
     $self->{low} = ($self->{low} << 8) + &getc($in);
+    $self->{buff} = &getc($in);
+    $self->{low} = ($self->{low} << 7) + ($self->{buff} >> 1);
 
     my $table = create_table(UCHAR_MAX);
     while ($size > 0) {
@@ -144,8 +145,10 @@ sub decode {
 sub decode_normalize {
     my ($self, $in) = @_;
     while ($self->{range} < MIN_RANGE) {
+        $self->{low}  = ($self->{low} << 1) + ($self->{buff} & 1);
+        $self->{buff} = &getc($in);
+        $self->{low}  = (($self->{low} << 7) + ($self->{buff} >> 1)) & MASK;
         $self->{range} <<= 8;
-        $self->{low} = (($self->{low} << 8) + &getc($in)) & MASK;
     }
 }
 
