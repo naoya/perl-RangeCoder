@@ -5,7 +5,7 @@ use IO::String;
 use UNIVERSAL::require;
 use Test::More qw/no_plan/;
 
-my @static_classses  = qw/RangeCoder RangeCoder::Wide/;
+my @static_classes  = qw/RangeCoder RangeCoder::Wide/;
 my @adaptive_classes = qw/RangeCoder::Adaptive RangeCoder::Adaptive::BIT RangeCoder::Adaptive::FiniteContext/;
 
 my $text =<<EOT;
@@ -20,6 +20,7 @@ Nulla mollis, urna iaculis euismod sodales, urna dolor facilisis erat, at placer
 Nulla quis metus vel lorem dignissim lobortis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Curabitur ut augue lectus. Nam tortor urna, rutrum ut porttitor ut, interdum vitae lacus. Morbi vitae orci a nibh dictum sagittis eu eget elit. Curabitur euismod scelerisque mauris id aliquet. Cras eu tellus vitae enim euismod dapibus. Aenean condimentum mollis dolor, eget egestas libero malesuada id. Praesent placerat fermentum tellus at fringilla. Integer convallis sapien at neque tincidunt iaculis. Aenean ultricies auctor enim, a eleifend dui porttitor nec. Aliquam tempor condimentum lacus nec varius. Vestibulum consequat, nibh a ultrices mattis, orci nibh vehicula ligula, eu semper lorem nibh nec tellus. Cras metus ante, sodales nec semper non, ultricies in nulla. Sed tempus lorem eget velit malesuada rutrum eu id erat. Suspendisse elit enim, mollis a hendrerit quis, mattis sit amet metus.
 EOT
 
+my $text_size = length $text;
 my @count;
 for (my $i = 0; $i < 0x100; $i++) {
     $count[$i] = 0;
@@ -38,7 +39,7 @@ sub test_compression {
         my $test = IO::String->new;
 
         my $rc = $is_adaptive ? $class->new : $class->new(\@count);
-        $rc->encode($in, $out, length $text);
+        $rc->encode($in, $out, $text_size);
 
         $out->seek(0, 0);
         $class->decode($out, $test);
@@ -46,10 +47,9 @@ sub test_compression {
         {
             local $/;
             $out->seek(0, 0);
-            ok length scalar <$out> > 0;
-
-            $out->seek(0, 0);
-            ok length scalar <$out> < length $text;
+            my $out_size = length scalar <$out>;
+            ok $out_size > 0;
+            ok $out_size < $text_size;
 
             $test->seek(0, 0);
             is scalar <$test>, $text;
@@ -61,5 +61,5 @@ sub test_compression {
     }
 }
 
-test_compression(0, @static_classses);
+test_compression(0, @static_classes);
 test_compression(1, @adaptive_classes);
