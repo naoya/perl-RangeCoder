@@ -1,14 +1,13 @@
 * これはなに?
 
-perl で実装した Range Coder
+perl で実装した Range Coder です (速度的には褒められた実装ではありません)
 
-- lib/RangeCoder.pm : 静的 Range Coder, low: 24bit, range 初期値 0x1000000)
-- lib/RangeCoder/Adaptive.pm : 適応型, 累積頻度表の実装はナイーブ
-- lib/RangeCoder/Wide.pm : 静的 Range Coder, low 31bit, range 初期値 0x7fffffff
+- lib/RangeCoder.pm : 静的 Range Coder, low: 31bit, range 初期値 0x7fffffff
+- lib/RangeCoder/Adaptive.pm : 適応型, 累積頻度表の実装はナイーブ, low 31 bit
 - lib/RangeCoder/Adaptive/BIT.pm : 適応型, Binary Indexed Tree で高速化, low 31 bit
 - lib/RangeCoder/FiniteContext.pm : 有限文脈モデル (1-order), low 31bit
 
-WEB+DB PRESS Vol.52 で解説予定
+WEB+DB PRESS Vol.52 で解説しています
 
 * 参考にした情報
 

@@ -6,30 +6,40 @@ use RangeCoder::Util;
 use List::Util qw/max/;
 
 use constant UCHAR_MAX => 256;
-use constant MAX_RANGE => 0x1000000;
-use constant MIN_RANGE => 0x10000;
-use constant MASK      => 0xffffff;
-use constant SHIFT     => 16;
+use constant MAX_RANGE => 0x7fffffff; # 31 bit
+use constant MIN_RANGE => 0x800000;
+use constant MASK      => 0x7fffffff;
+use constant SHIFT     => 23;         # 31 bit の上位 8 bit
 
 sub new {
     my ($class, $count) = @_;
     my $self = bless { count => $count }, $class;
 
-    ## Smoothing (奥村さんの方式)
-    ## 655355 を越えないように
-    ## 度数の最大値が 255 になるように調節
-    if ((my $m = max(@$count)) >= 256) {
-       use integer;
-       for my $v (@$count) {
-           $v = ($v * 255 + $m - 1) / $m;
-       }
+    ## 頻度表のスムージング
+    if ((my $m = max(@$count)) > 0x7fff) {
+        $self->{count} = [];
+        my $n = 0;
+        while ($m > 0x7fff) {
+            $m >>= 1;
+            $n++;
+        }
+
+        for my $i (0..@$count - 1) {
+            if ($count->[$i] != 0) {
+                $self->{count}->[$i] = ($count->[$i] >> $n) | 1;
+            } else {
+                $self->{count}->[$i] = 0;
+            }
+        }
     }
 
+    ## 累積頻度表を作る
     my @cumfreq = (0);
     for (my $i = 0; $i < UCHAR_MAX; $i++) {
         $cumfreq[$i + 1] = $cumfreq[$i] + $self->{count}->[$i];
     }
 
+    ## 累積頻度が上限に達していたら assert
     if ($cumfreq[-1] >= MIN_RANGE) {
         die sprintf 'assert (total symbol occurence: %d)', $cumfreq[-1];
     }
@@ -45,15 +55,16 @@ sub new {
 sub encode {
     my ($self, $in, $out, $size) = @_;
 
-    ## サイズ書き込み
+    ## データサイズ書き込み
     $out->print(pack('I', $size));
 
-    ## 出現頻度表書き込み
+    ## 累積頻度表書き込み
     my $cnt_bin = pack('w*', @{$self->{count}});
     $out->print(pack('I', length $cnt_bin));
     $out->print($cnt_bin);
 
     while (defined(my $c = &getc($in))) {
+        ## 1記号ずつ読みながら区間を更新
         my $tmp;
         {
             use integer;
@@ -63,6 +74,8 @@ sub encode {
         my $old_low  = $self->{low};
         $self->{low}   = ($old_low + $self->{cumfreq}->[$c] * $tmp) & MASK;
         $self->{range} = $self->{count}->[$c] * $tmp;
+
+        ## 必要なら確定した数値を符号化
         $self->encode_normalize($old_low, $out);
     }
     $self->finish($out);
@@ -111,32 +124,37 @@ sub finish {
     for (my $i = $self->{n_carry}; $i > 0; $i--) {
         putc($out, 0xff);
     }
-    putc($out, ($self->{low} >> 16) & 0xff);
-    putc($out, ($self->{low} >> 8)  & 0xff);
-    putc($out, $self->{low} & 0xff);
+
+    ## 31 bit 書き出し
+    putc($out, ($self->{low} >> 23) & 0xff);
+    putc($out, ($self->{low} >> 15) & 0xff);
+    putc($out, ($self->{low} >> 7)  & 0xff);
+    putc($out, ($self->{low} & 0x7f) << 1);
 }
 
 sub decode {
     my ($class, $in, $out) = @_;
 
-    ## サイズ読み込み
+    ## データサイズ読み出し
     $in->read(my $tmp, 8) or die $@;
     my ($size, $cnt_size) = unpack('I2', $tmp);
 
-    ## 頻度表読み込み
+    ## 頻度表読み出し
     $in->read(my $cnt_bin, $cnt_size) or die $!;
     my @count = unpack('w*', $cnt_bin);
 
-    # 1 byte 読み捨て
+    ## 1バイト読み捨て
     &getc($in);
 
     my $self = $class->new(\@count);
     $self->{low} = &getc($in);
     $self->{low} = ($self->{low} << 8) + &getc($in);
     $self->{low} = ($self->{low} << 8) + &getc($in);
+    $self->{buff} = &getc($in);
+    $self->{low} = ($self->{low} << 7) + ($self->{buff} >> 1);
 
     ## cumfreq[c]/total <= low/range < cumfreq[c + 1]/total な c を探す
-    ## 探し当てたら low と range を更新して同様に繰り返す
+    ## 探し当てたら区間 (low と range) を更新して同様に繰り返す
     while ($size > 0) {
         my ($tmp, $c);
         {
@@ -157,8 +175,12 @@ sub decode {
 sub decode_normalize {
     my ($self, $in) = @_;
     while ($self->{range} < MIN_RANGE) {
+        # buff の 1 ビット挿入
+        $self->{low} = ($self->{low} << 1) + ($self->{buff} & 1);
+        # 読み出したデータから上位 7 ビットを挿入。残り1ビットは buff に残して次回に
+        $self->{buff} = &getc($in);
+        $self->{low} = (($self->{low} << 7) + ($self->{buff} >> 1)) & MASK;
         $self->{range} <<= 8;
-        $self->{low} = (($self->{low} << 8) + &getc($in)) & MASK;
     }
 }
 
